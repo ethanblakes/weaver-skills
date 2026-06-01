@@ -1,0 +1,21 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link "← 技能中心" [ref=e6] [cursor=pointer]:
+            - /url: /
+          - generic [ref=e7]: "|"
+          - heading "文档" [level=1] [ref=e8]
+          - generic [ref=e9]: sxebu/docs
+        - link "仓库管理 →" [ref=e10] [cursor=pointer]:
+          - /url: http://47.97.118.21:3000/sxebu/docs
+    - generic [ref=e11]:
+      - complementary [ref=e12]:
+        - generic [ref=e13]:
+          - heading "文章列表" [level=2] [ref=e14]
+          - generic [ref=e15]: 加载中...
+      - main [ref=e16]
+  - button "Open Next.js Dev Tools" [ref=e22] [cursor=pointer]:
+    - img [ref=e23]
+  - alert [ref=e26]

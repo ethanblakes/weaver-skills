@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MarkdownRenderer } from "@/components/markdown-renderer";
 
 const GITEA_URL = process.env.NEXT_PUBLIC_GITEA_URL || "http://localhost:3000";
 const ORG = process.env.NEXT_PUBLIC_GITEA_ORG || "weaver";
@@ -270,29 +269,7 @@ function DocsContent() {
 
           {activeFile && !contentLoading && content && !error && (
             <article className="px-8 py-8 max-w-3xl mx-auto">
-              <div className="prose prose-invert prose-zinc max-w-none
-                prose-headings:text-zinc-100
-                prose-h1:text-2xl prose-h1:font-bold prose-h1:mt-0 prose-h1:mb-6 prose-h1:pb-4 prose-h1:border-b prose-h1:border-zinc-800
-                prose-h2:text-xl prose-h2:font-semibold prose-h2:mt-8 prose-h2:mb-4
-                prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3
-                prose-p:text-zinc-300 prose-p:leading-relaxed prose-p:my-4
-                prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
-                prose-code:text-emerald-400 prose-code:text-sm prose-code:bg-zinc-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
-                prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-zinc-800 prose-pre:rounded-lg
-                prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
-                prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
-                prose-li:text-zinc-300 prose-li:my-1
-                prose-blockquote:border-l-2 prose-blockquote:border-zinc-700 prose-blockquote:pl-4 prose-blockquote:text-zinc-400 prose-blockquote:italic
-                prose-strong:text-zinc-100 prose-strong:font-semibold
-                prose-hr:border-zinc-800
-                prose-table:border-collapse prose-th:border prose-th:border-zinc-700 prose-th:bg-zinc-900 prose-th:px-3 prose-th:py-2 prose-th:text-sm prose-td:border prose-td:border-zinc-800 prose-td:px-3 prose-td:py-2 prose-td:text-sm
-                prose-img:rounded-lg
-                [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-zinc-200 [&_pre_code]:text-sm
-              ">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {content}
-                </ReactMarkdown>
-              </div>
+              <MarkdownRenderer content={content} />
             </article>
           )}
         </main>

@@ -42,10 +42,10 @@ function CodeBlock({ children, ...props }: ComponentProps<"pre">) {
       <button
         onClick={handleCopy}
         className="absolute top-3 right-3 z-10 rounded-md px-2 py-1 text-xs
-          bg-zinc-800 text-zinc-400 opacity-0 group-hover:opacity-100
-          hover:bg-zinc-700 hover:text-zinc-200
+          bg-app-surface-elevated text-app-text-muted opacity-0 group-hover:opacity-100
+          hover:bg-app-surface-hover hover:text-app-text
           transition-all duration-150
-          border border-zinc-700"
+          border border-app-border-hover"
         aria-label="复制代码"
       >
         {copied ? "已复制 ✓" : "复制"}
@@ -59,7 +59,7 @@ function CodeBlock({ children, ...props }: ComponentProps<"pre">) {
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   return (
-    <div className={["prose prose-invert prose-zinc max-w-none", className]
+    <div className={["prose max-w-none", className]
       .filter(Boolean)
       .join(" ")}
     >

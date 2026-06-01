@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { ThemeProvider } from "next-themes";
+import { HighlightStylesheet } from "@/components/highlight-stylesheet";
 import "./globals.css";
-import "highlight.js/styles/github-dark.css";
 
 const geistSans = localFont({
   src: [
@@ -40,9 +41,15 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
-      className={`${geistSans.variable} ${geistMono.variable} dark`}
+      className={`${geistSans.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
     >
-      <body className="min-h-screen bg-zinc-950 antialiased">{children}</body>
+      <body className="min-h-screen bg-app-bg antialiased">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <HighlightStylesheet />
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

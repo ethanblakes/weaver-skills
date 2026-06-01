@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { GiteaRepo, Skill, SkillMeta } from "./types";
+import { AppHeader } from "@/components/app-header";
 
 const GITEA_URL = process.env.NEXT_PUBLIC_GITEA_URL || "http://localhost:3000";
 const ORG = process.env.NEXT_PUBLIC_GITEA_ORG || "weaver";
@@ -36,6 +37,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   const fetchSkills = useCallback(async () => {
     try {
@@ -106,55 +109,47 @@ export default function Home() {
     return name.includes(q) || desc.includes(q);
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
   const installCmd = (repo: Skill) =>
     `npx skills add ${GITEA_URL}/${ORG}/${repo.name}.git`;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-200">
-      {/* 顶栏 */}
-      <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">
-              <span className="text-white">Weaver</span>{" "}
-              <span className="text-zinc-500 font-normal">技能中心</span>
-            </h1>
-            <p className="text-sm text-zinc-500 mt-0.5">
-              企业技能注册中心 · 基于 Gitea
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <a
-              href="/docs"
-              className="text-sm font-medium text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 hover:border-emerald-400/50 transition-all"
-            >
-              文档中心
-            </a>
-            <button
-              onClick={fetchSkills}
-              className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-              title="刷新"
-            >
-              ↻
-            </button>
-            <a
-              href={`${GITEA_URL}/${ORG}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              仓库管理 →
-            </a>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen flex flex-col bg-app-bg text-app-text">
+      <AppHeader
+        page="home"
+        rightActions={
+          <button
+            onClick={fetchSkills}
+            className="text-sm text-app-text-muted hover:text-app-text transition-colors"
+            title="刷新"
+          >
+            ↻
+          </button>
+        }
+      >
+        <h1 className="text-xl font-semibold tracking-tight">
+          <span className="text-app-text-primary">Weaver</span>{" "}
+          <span className="text-app-text-muted font-normal">技能中心</span>
+        </h1>
+        <p className="text-sm text-app-text-muted mt-0.5">
+          企业技能注册中心 · 基于 Gitea
+        </p>
+      </AppHeader>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="flex-1 max-w-5xl mx-auto px-6 py-8 w-full">
         {/* 搜索 */}
         <div className="flex items-center gap-4 mb-8">
           <div className="relative flex-1 max-w-sm">
             <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-muted"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -170,21 +165,21 @@ export default function Home() {
               type="text"
               placeholder="搜索技能..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm
-                         text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-600
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-app-surface border border-app-border rounded-lg text-sm
+                         text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-app-border-hover
                          transition-colors"
             />
           </div>
-          <span className="text-sm text-zinc-600">
-            共 {filtered.length} 个技能
+          <span className="text-sm text-app-text-dim">
+            共 {filtered.length} 个技能{totalPages > 1 ? ` · 第 ${safePage}/${totalPages} 页` : ""}
           </span>
         </div>
 
         {/* 加载中 */}
         {loading && (
           <div className="flex items-center justify-center py-24">
-            <div className="flex items-center gap-3 text-zinc-500">
+            <div className="flex items-center gap-3 text-app-text-muted">
               <svg
                 className="animate-spin h-5 w-5"
                 fill="none"
@@ -211,8 +206,8 @@ export default function Home() {
 
         {/* 错误 */}
         {error && !loading && (
-          <div className="bg-red-950/30 border border-red-900/50 rounded-lg p-4 mb-8">
-            <div className="flex items-center gap-2 text-red-400 text-sm">
+          <div className="bg-app-error-bg border border-app-error-border rounded-lg p-4 mb-8">
+            <div className="flex items-center gap-2 text-app-error-text text-sm">
               <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
@@ -229,10 +224,10 @@ export default function Home() {
         {!loading && !error && filtered.length === 0 && (
           <div className="text-center py-24">
             <div className="text-4xl mb-4">📦</div>
-            <h3 className="text-lg font-medium text-zinc-400 mb-2">
+            <h3 className="text-lg font-medium text-app-text mb-2">
               {search ? "未找到匹配的技能" : "暂无技能"}
             </h3>
-            <p className="text-sm text-zinc-600">
+            <p className="text-sm text-app-text-dim">
               {search ? (
                 "试试其他关键词"
               ) : (
@@ -242,11 +237,11 @@ export default function Home() {
                     href={`${GITEA_URL}/${ORG}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-500 hover:text-blue-400"
+                    className="text-app-accent hover:underline"
                   >
                     {ORG}
                   </a>{" "}
-                  组织下创建仓库，放入 <code className="text-zinc-500">SKILL.md</code> 文件即可
+                  组织下创建仓库，放入 <code className="text-app-text-muted">SKILL.md</code> 文件即可
                 </>
               )}
             </p>
@@ -256,11 +251,11 @@ export default function Home() {
         {/* 技能卡片 */}
         {!loading && !error && filtered.length > 0 && (
           <div className="space-y-3">
-            {filtered.map((skill) => (
+            {paginated.map((skill) => (
               <div
                 key={skill.id}
-                className="group bg-zinc-900 border border-zinc-800 rounded-xl p-5
-                           hover:border-zinc-700 transition-all duration-200"
+                className="group bg-app-surface border border-app-border rounded-xl p-5
+                           hover:border-app-border-hover transition-all duration-200"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
@@ -270,18 +265,18 @@ export default function Home() {
                         href={skill.html_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-base font-medium text-zinc-200 hover:text-white
+                        className="text-base font-medium text-app-text hover:text-app-text-primary
                                    transition-colors truncate"
                       >
                         {skill.meta?.name || skill.name}
                       </a>
                       {skill.meta?.version && (
-                        <span className="text-xs font-mono text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
+                        <span className="text-xs font-mono text-app-text-muted bg-app-surface-elevated px-1.5 py-0.5 rounded">
                           v{skill.meta.version}
                         </span>
                       )}
                       {skill.meta?.category && (
-                        <span className="text-xs text-zinc-500 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-800">
+                        <span className="text-xs text-app-text-muted bg-app-surface-hover px-1.5 py-0.5 rounded border border-app-border">
                           {skill.meta.category}
                         </span>
                       )}
@@ -289,7 +284,7 @@ export default function Home() {
                       {(skill as any).subdirs?.map((dir: string) => (
                         <span
                           key={dir}
-                          className="text-xs text-zinc-400 bg-emerald-950/30 border border-emerald-900/30 px-1.5 py-0.5 rounded"
+                          className="text-xs text-app-badge-text bg-app-badge-bg border border-app-badge-border px-1.5 py-0.5 rounded"
                           title={`包含 ${dir}/ 目录`}
                         >
                           {RESOURCE_ICONS[dir] || "📁"} {dir}
@@ -298,12 +293,12 @@ export default function Home() {
                     </div>
 
                     {/* 描述 */}
-                    <p className="text-sm text-zinc-500 leading-relaxed">
+                    <p className="text-sm text-app-text-muted leading-relaxed">
                       {skill.meta?.description || skill.description || "暂无描述"}
                     </p>
 
                     {/* 元信息 */}
-                    <div className="flex items-center gap-3 mt-2 text-xs text-zinc-600">
+                    <div className="flex items-center gap-3 mt-2 text-xs text-app-text-dim">
                       {(skill as any).author && (
                         <span>{(skill as any).author}</span>
                       )}
@@ -320,15 +315,15 @@ export default function Home() {
 
                   {/* 仓库名 */}
                   <div className="hidden sm:flex items-center gap-2 shrink-0">
-                    <code className="text-xs font-mono text-zinc-600 group-hover:text-zinc-500 transition-colors">
+                    <code className="text-xs font-mono text-app-text-dim group-hover:text-app-text-muted transition-colors">
                       {ORG}/{skill.name}
                     </code>
                   </div>
                 </div>
 
                 {/* 安装命令 */}
-                <div className="mt-4 flex items-center gap-2 bg-black/40 border border-zinc-800 rounded-lg px-4 py-2.5">
-                  <code className="flex-1 text-sm font-mono text-emerald-400/80 truncate">
+                <div className="mt-4 flex items-center gap-2 bg-app-surface-elevated border border-app-border rounded-lg px-4 py-2.5">
+                  <code className="flex-1 text-sm font-mono text-app-success-text truncate">
                     {installCmd(skill)}
                   </code>
                   <CopyButton text={installCmd(skill)} />
@@ -337,11 +332,48 @@ export default function Home() {
             ))}
           </div>
         )}
+
+        {/* 分页控制 */}
+        {!loading && !error && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-8">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+              className="px-3 py-1.5 text-sm rounded-md border border-app-border
+                         text-app-text-muted hover:text-app-text hover:border-app-border-hover
+                         disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              上一页
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                className={`w-8 h-8 text-sm rounded-md transition-colors ${
+                  p === safePage
+                    ? "bg-app-surface-elevated text-app-text-primary font-medium border border-app-border-hover"
+                    : "text-app-text-muted hover:text-app-text border border-transparent"
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+              className="px-3 py-1.5 text-sm rounded-md border border-app-border
+                         text-app-text-muted hover:text-app-text hover:border-app-border-hover
+                         disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              下一页
+            </button>
+          </div>
+        )}
       </main>
 
       {/* 页脚 */}
-      <footer className="border-t border-zinc-800 mt-12">
-        <div className="max-w-5xl mx-auto px-6 py-4 text-xs text-zinc-700 text-center">
+      <footer className="border-t border-app-border mt-12">
+        <div className="max-w-5xl mx-auto px-6 py-4 text-xs text-app-text-dim text-center">
           Weaver 技能中心 · 由 Gitea 驱动
         </div>
       </footer>
@@ -373,7 +405,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       className="shrink-0 px-3 py-1 text-xs font-medium rounded-md
-                 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200
+                 bg-app-surface-elevated text-app-text-muted hover:bg-app-surface-hover hover:text-app-text
                  active:scale-95 transition-all"
     >
       {copied ? "已复制" : "复制"}

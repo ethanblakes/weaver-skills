@@ -42,3 +42,5 @@ next-env.d.ts
 
 # app logs
 /logs
+
+.playwright-mcp

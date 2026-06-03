@@ -5,6 +5,7 @@ import type { Skill } from "../types";
 import { AppHeader } from "@/components/app-header";
 import { RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
 
 const GITEA_URL = process.env.NEXT_PUBLIC_GITEA_URL || "http://localhost:3000";
 const ORG = process.env.NEXT_PUBLIC_GITEA_ORG || "weaver";
@@ -31,6 +32,11 @@ type SkillsResponse = {
 };
 
 export default function Home() {
+  const { data: session } = authClient.useSession();
+  const userRole = (session?.user as Record<string, unknown> | undefined)
+    ?.role as string | undefined;
+  const isAdmin = userRole === "admin";
+
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -139,34 +145,17 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-app-bg text-app-text">
-      <AppHeader
-        page="home"
-        rightActions={
-          <button
-            onClick={handleRefresh}
-            disabled={refreshDisabled}
-            className="inline-flex size-9 items-center justify-center rounded-md text-app-text-muted
-                       hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50
-                       disabled:cursor-not-allowed transition-colors"
-            title="刷新"
-          >
-            <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
-        }
-      >
-        <h1 className="text-xl font-semibold tracking-tight">
+      <AppHeader page="home">
+        <h1 className="text-sm font-semibold tracking-tight">
           <span className="text-app-text-primary">Weaver</span>{" "}
           <span className="text-app-text-muted font-normal">技能中心</span>
         </h1>
-        <p className="text-sm text-app-text-muted mt-0.5">
-          企业技能注册中心 · 基于 Gitea
-        </p>
       </AppHeader>
 
       <main className="flex-1 max-w-5xl mx-auto px-6 py-8 w-full">
-        {/* 搜索 */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="relative flex-1 max-w-sm">
+        {/* 搜索 & 操作 */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="relative w-full max-w-sm">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-muted"
               fill="none"
@@ -190,12 +179,24 @@ export default function Home() {
                          transition-colors"
             />
           </div>
-          <span className="text-sm text-app-text-dim">
-            共 {filtered.length} 个技能{totalPages > 1 ? ` · 第 ${safePage}/${totalPages} 页` : ""}
-            {refreshedAt
-              ? ` · 刷新于 ${new Date(refreshedAt).toLocaleString("zh-CN")}`
-              : ""}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-app-text-dim whitespace-nowrap">
+              共 {filtered.length} 个技能{totalPages > 1 ? ` · 第 ${safePage}/${totalPages} 页` : ""}
+              {refreshedAt
+                ? ` · 刷新于 ${new Date(refreshedAt).toLocaleString("zh-CN")}`
+                : ""}
+            </span>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshDisabled}
+              className="inline-flex size-9 items-center justify-center rounded-lg border border-app-border
+                         text-app-text-muted hover:bg-app-surface-hover hover:text-app-text hover:border-app-border-hover
+                         disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="刷新"
+            >
+              <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
 
         {/* 加载中 */}
@@ -284,15 +285,21 @@ export default function Home() {
                   <div className="min-w-0 flex-1">
                     {/* 名称 & 标签 */}
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <a
-                        href={skill.html_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-base font-medium text-app-text hover:text-app-text-primary
-                                   transition-colors truncate"
-                      >
-                        {skill.meta?.name || skill.name}
-                      </a>
+                      {isAdmin ? (
+                        <a
+                          href={skill.html_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-base font-medium text-app-text hover:text-app-text-primary
+                                     transition-colors truncate"
+                        >
+                          {skill.meta?.name || skill.name}
+                        </a>
+                      ) : (
+                        <span className="text-base font-medium text-app-text truncate">
+                          {skill.meta?.name || skill.name}
+                        </span>
+                      )}
                       {skill.meta?.version && (
                         <span className="text-xs font-mono text-app-text-muted bg-app-surface-elevated px-1.5 py-0.5 rounded">
                           v{skill.meta.version}

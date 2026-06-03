@@ -1,29 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { GiteaRepo, Skill, SkillMeta } from "../types";
+import type { Skill } from "../types";
 import { AppHeader } from "@/components/app-header";
+import { RefreshCwIcon } from "lucide-react";
+import { toast } from "sonner";
 
 const GITEA_URL = process.env.NEXT_PUBLIC_GITEA_URL || "http://localhost:3000";
 const ORG = process.env.NEXT_PUBLIC_GITEA_ORG || "weaver";
 const DOCS_REPO = process.env.NEXT_PUBLIC_GITEA_DOCS_REPO || "docs";
-const API_BASE = "/api/gitea";
-
-function parseFrontmatter(text: string): SkillMeta | null {
-  const match = text.match(/^---\s*\n([\s\S]*?)\n---/);
-  if (!match) return null;
-  const result: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
-    const kv = line.match(/^(\w[\w-]*):\s*(.*)/);
-    if (kv) result[kv[1]] = kv[2].trim();
-  }
-  return {
-    name: result.name || "",
-    description: result.description || "",
-    version: result.version,
-    category: result.category,
-  };
-}
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -36,10 +21,23 @@ const RESOURCE_ICONS: Record<string, string> = {
   assets: "🎨",
 };
 
+type SkillsResponse = {
+  skills: Skill[];
+  refreshedAt: string | null;
+  stale: boolean;
+  warning?: string;
+  error?: string;
+  nextRefreshAt?: string | null;
+};
+
 export default function Home() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
+  const [nextRefreshAt, setNextRefreshAt] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 12;
@@ -49,52 +47,17 @@ export default function Home() {
       setLoading(true);
       setError("");
 
-      const reposResp = await fetch(`${API_BASE}/orgs/${ORG}/repos`);
-      if (!reposResp.ok) throw new Error(`Gitea API: ${reposResp.status}`);
-      const repos: GiteaRepo[] = await reposResp.json();
+      const resp = await fetch("/api/skills");
+      const data = (await resp.json()) as SkillsResponse;
+      if (!resp.ok) throw new Error(data.error || `Skills API: ${resp.status}`);
 
-      const skillsWithMeta = await Promise.all(
-        repos.map(async (repo) => {
-          let meta: SkillMeta | null = null;
-          const subdirs: string[] = [];
-
-          try {
-            const [rawResp, contentsResp, commitsResp] = await Promise.all([
-              fetch(`${API_BASE}/repos/${ORG}/${repo.name}/raw/SKILL.md`),
-              fetch(`${API_BASE}/repos/${ORG}/${repo.name}/contents`),
-              fetch(`${API_BASE}/repos/${ORG}/${repo.name}/commits?limit=1`),
-            ]);
-
-            if (rawResp.ok) {
-              const text = await rawResp.text();
-              meta = parseFrontmatter(text);
-            }
-
-            if (contentsResp.ok) {
-              const contents: { type: string; name: string }[] =
-                await contentsResp.json();
-              const known = ["references", "scripts", "templates", "assets"];
-              subdirs.push(
-                ...contents
-                  .filter((c) => c.type === "dir" && known.includes(c.name))
-                  .map((c) => c.name)
-              );
-            }
-
-            if (commitsResp.ok) {
-              const commits: { commit: { author: { name: string } } }[] =
-                await commitsResp.json();
-              return { ...repo, meta, subdirs, author: commits[0]?.commit?.author?.name };
-            }
-          } catch {}
-
-          return { ...repo, meta, subdirs };
-        })
-      );
-
-      setSkills(skillsWithMeta);
+      setSkills(data.skills);
+      setRefreshedAt(data.refreshedAt);
+      if (data.warning) toast.warning(data.warning);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "获取技能列表失败"));
+      const message = getErrorMessage(err, "获取技能列表失败");
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -106,6 +69,16 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [fetchSkills]);
+
+  useEffect(() => {
+    if (!nextRefreshAt) return;
+
+    const interval = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [nextRefreshAt]);
 
   const filtered = skills.filter((s) => {
     if (s.name === DOCS_REPO) return false;
@@ -125,6 +98,42 @@ export default function Home() {
     setPage(1);
   };
 
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      setError("");
+
+      const resp = await fetch("/api/skills/refresh", { method: "POST" });
+      const data = (await resp.json()) as SkillsResponse;
+
+      if (!resp.ok) {
+        if (resp.status === 429 && data.nextRefreshAt) {
+          setNextRefreshAt(data.nextRefreshAt);
+          toast.warning(
+            `请在 ${new Date(data.nextRefreshAt).toLocaleTimeString("zh-CN")} 后再刷新`
+          );
+          return;
+        }
+        throw new Error(data.error || `Skills refresh: ${resp.status}`);
+      }
+
+      setSkills(data.skills);
+      setRefreshedAt(data.refreshedAt);
+      setNextRefreshAt(data.nextRefreshAt ?? null);
+      toast.success("技能列表已刷新");
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "刷新技能列表失败");
+      setError(message);
+      toast.error(message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const refreshDisabled =
+    refreshing ||
+    (nextRefreshAt ? nowMs < new Date(nextRefreshAt).getTime() : false);
+
   const installCmd = (repo: Skill) =>
     `npx skills add ${GITEA_URL}/${ORG}/${repo.name}.git`;
 
@@ -134,11 +143,14 @@ export default function Home() {
         page="home"
         rightActions={
           <button
-            onClick={fetchSkills}
-            className="text-sm text-app-text-muted hover:text-app-text transition-colors"
+            onClick={handleRefresh}
+            disabled={refreshDisabled}
+            className="inline-flex size-9 items-center justify-center rounded-md text-app-text-muted
+                       hover:bg-app-surface-hover hover:text-app-text disabled:opacity-50
+                       disabled:cursor-not-allowed transition-colors"
             title="刷新"
           >
-            ↻
+            <RefreshCwIcon className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
         }
       >
@@ -180,6 +192,9 @@ export default function Home() {
           </div>
           <span className="text-sm text-app-text-dim">
             共 {filtered.length} 个技能{totalPages > 1 ? ` · 第 ${safePage}/${totalPages} 页` : ""}
+            {refreshedAt
+              ? ` · 刷新于 ${new Date(refreshedAt).toLocaleString("zh-CN")}`
+              : ""}
           </span>
         </div>
 
@@ -239,16 +254,17 @@ export default function Home() {
                 "试试其他关键词"
               ) : (
                 <>
-                  在{" "}
-                  <a
-                    href={`${GITEA_URL}/${ORG}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-app-accent hover:underline"
-                  >
-                    {ORG}
-                  </a>{" "}
-                  组织下创建仓库，放入 <code className="text-app-text-muted">SKILL.md</code> 文件即可
+                  当前没有你可见的技能。
+                  <span className="block mt-1">
+                    管理员可以在{" "}
+                    <a
+                      href="/admin"
+                      className="text-app-accent hover:underline"
+                    >
+                      权限管理
+                    </a>{" "}
+                    中授予访问权限。
+                  </span>
                 </>
               )}
             </p>

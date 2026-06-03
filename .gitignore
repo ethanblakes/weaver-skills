@@ -44,3 +44,18 @@ next-env.d.ts
 /logs
 
 .playwright-mcp
+
+# database
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# drizzle
+/drizzle
+
+
+.sqlite.db
+.sqlite.db-shm
+.sqlite.db-wal
+.sqlite.db-journal

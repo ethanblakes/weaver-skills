@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { authClient, adminClient } from "@/lib/auth-client";
+import type { Skill } from "../../types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,14 +60,30 @@ interface AdminUser {
   createdAt: string;
 }
 
+interface SkillPermissionGrant {
+  id: string;
+  skillName: string;
+  userId: string;
+  grantedBy: string | null;
+  createdAt: string;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [permissionGrants, setPermissionGrants] = useState<SkillPermissionGrant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [permissionsSaving, setPermissionsSaving] = useState(false);
 
   // Search
   const [search, setSearch] = useState("");
+  const [skillSearch, setSkillSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [selectedSkillNames, setSelectedSkillNames] = useState<string[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   // Create user dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -85,13 +102,34 @@ export default function AdminPage() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await adminClient.admin.listUsers({ query: {} });
       setUsers((res.data?.users as AdminUser[]) || []);
     } catch {
       toast.error("Failed to load users");
+    }
+  }, []);
+
+  const fetchSkills = useCallback(async () => {
+    const resp = await fetch("/api/skills");
+    const data = (await resp.json()) as { skills?: Skill[]; error?: string };
+    if (!resp.ok) throw new Error(data.error || "Failed to load skills");
+    setSkills(data.skills || []);
+  }, []);
+
+  const fetchPermissions = useCallback(async () => {
+    try {
+      setPermissionsLoading(true);
+      const resp = await fetch("/api/skills/permissions");
+      const data = (await resp.json()) as {
+        grants?: SkillPermissionGrant[];
+        error?: string;
+      };
+      if (!resp.ok) throw new Error(data.error || "Failed to load permissions");
+      setPermissionGrants(data.grants || []);
+    } catch {
+      toast.error("Failed to load skill permissions");
     } finally {
-      setLoading(false);
+      setPermissionsLoading(false);
     }
   }, []);
 
@@ -109,10 +147,112 @@ export default function AdminPage() {
     }
 
     const timeout = window.setTimeout(() => {
-      void fetchUsers();
+      void Promise.allSettled([fetchUsers(), fetchSkills(), fetchPermissions()]).finally(
+        () => setLoading(false)
+      );
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [session, isPending, router, fetchUsers, userRole]);
+  }, [session, isPending, router, fetchUsers, fetchSkills, fetchPermissions, userRole]);
+
+  // --- Derived data ---
+
+  const filteredUsers = users.filter((u) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.role.toLowerCase().includes(q)
+    );
+  });
+
+  const adminCount = users.filter((u) => u.role === "admin").length;
+  const bannedCount = users.filter((u) => u.banned).length;
+  const userLookup = useMemo(
+    () => new Map(users.map((user) => [user.id, user])),
+    [users]
+  );
+  const permissionMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const grant of permissionGrants) {
+      const set = map.get(grant.skillName) || new Set<string>();
+      set.add(grant.userId);
+      map.set(grant.skillName, set);
+    }
+    return map;
+  }, [permissionGrants]);
+  const filteredSkills = skills.filter((skill) => {
+    if (!skillSearch.trim()) return true;
+    const q = skillSearch.toLowerCase();
+    return (
+      skill.name.toLowerCase().includes(q) ||
+      (skill.meta?.name || "").toLowerCase().includes(q) ||
+      (skill.meta?.description || skill.description || "").toLowerCase().includes(q)
+    );
+  });
+  const filteredPermissionUsers = users.filter((user) => {
+    if (!userSearch.trim()) return true;
+    const q = userSearch.toLowerCase();
+    return (
+      user.name.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q) ||
+      user.role.toLowerCase().includes(q)
+    );
+  });
+  const selectedSkillCount = selectedSkillNames.length;
+  const selectedUserCount = selectedUserIds.length;
+
+  const toggleSelection = (
+    current: string[],
+    value: string,
+    setValue: (next: string[]) => void
+  ) => {
+    setValue(
+      current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value]
+    );
+  };
+
+  const clearPermissionSelection = () => {
+    setSelectedSkillNames([]);
+    setSelectedUserIds([]);
+  };
+
+  const handlePermissionMutation = async (mode: "grant" | "revoke") => {
+    if (!selectedSkillNames.length || !selectedUserIds.length) {
+      toast.error("Please select at least one skill and one user");
+      return;
+    }
+
+    try {
+      setPermissionsSaving(true);
+      const resp = await fetch("/api/skills/permissions", {
+        method: mode === "grant" ? "POST" : "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          skillNames: selectedSkillNames,
+          userIds: selectedUserIds,
+        }),
+      });
+      const data = (await resp.json()) as {
+        grants?: SkillPermissionGrant[];
+        error?: string;
+      };
+
+      if (!resp.ok) throw new Error(data.error || "Failed to update permissions");
+
+      setPermissionGrants(data.grants || []);
+      toast.success(
+        mode === "grant" ? "Skill access granted" : "Skill access revoked"
+      );
+      clearPermissionSelection();
+    } catch {
+      toast.error("Failed to update skill permissions");
+    } finally {
+      setPermissionsSaving(false);
+    }
+  };
 
   if (isPending || loading) {
     return (
@@ -122,6 +262,7 @@ export default function AdminPage() {
       </div>
     );
   }
+
 
   if (!session) return null;
 
@@ -195,20 +336,6 @@ export default function AdminPage() {
     }
   };
 
-  // --- Derived data ---
-
-  const filteredUsers = users.filter((u) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q)
-    );
-  });
-
-  const adminCount = users.filter((u) => u.role === "admin").length;
-  const bannedCount = users.filter((u) => u.banned).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -388,6 +515,201 @@ export default function AdminPage() {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Skill Permissions */}
+        <Card>
+          <CardHeader className="space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ShieldIcon className="size-4 text-muted-foreground" />
+                  Skill Access
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Select one or more repositories and one or more users, then grant or revoke access in bulk.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{selectedSkillCount} skills selected</span>
+                <span>{selectedUserCount} users selected</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Repositories</Label>
+                  <Input
+                    value={skillSearch}
+                    onChange={(e) => setSkillSearch(e.target.value)}
+                    placeholder="Search skills..."
+                    className="max-w-56"
+                  />
+                </div>
+                <div className="max-h-72 overflow-auto rounded-lg border">
+                  {filteredSkills.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground">
+                      No skills found.
+                    </div>
+                  ) : (
+                    filteredSkills.map((skill) => {
+                      const selected = selectedSkillNames.includes(skill.name);
+                      const assignedCount = permissionMap.get(skill.name)?.size || 0;
+                      return (
+                        <label
+                          key={skill.name}
+                          className={`flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 ${
+                            selected ? "bg-muted/50" : "bg-background"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {skill.meta?.name || skill.name}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {skill.meta?.description || skill.description || "No description"}
+                            </div>
+                            {assignedCount > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {Array.from(permissionMap.get(skill.name) || [])
+                                  .slice(0, 3)
+                                  .map((userId) => {
+                                    const assignedUser = userLookup.get(userId);
+                                    return (
+                                      <span
+                                        key={userId}
+                                        className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                                      >
+                                        {assignedUser?.name || assignedUser?.email || userId}
+                                      </span>
+                                    );
+                                  })}
+                                {assignedCount > 3 && (
+                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                                    +{assignedCount - 3}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs text-muted-foreground">
+                              {assignedCount} users
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() =>
+                                toggleSelection(
+                                  selectedSkillNames,
+                                  skill.name,
+                                  setSelectedSkillNames
+                                )
+                              }
+                              className="size-4 rounded border-input"
+                            />
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Label>Users</Label>
+                  <Input
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Search users..."
+                    className="max-w-56"
+                  />
+                </div>
+                <div className="max-h-72 overflow-auto rounded-lg border">
+                  {filteredPermissionUsers.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground">
+                      No users found.
+                    </div>
+                  ) : (
+                    filteredPermissionUsers.map((user) => {
+                      const selected = selectedUserIds.includes(user.id);
+                      return (
+                        <label
+                          key={user.id}
+                          className={`flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 ${
+                            selected ? "bg-muted/50" : "bg-background"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium">
+                              {user.name}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {user.email}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline">{user.role}</Badge>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() =>
+                                toggleSelection(
+                                  selectedUserIds,
+                                  user.id,
+                                  setSelectedUserIds
+                                )
+                              }
+                              className="size-4 rounded border-input"
+                            />
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={() => void handlePermissionMutation("grant")}
+                disabled={permissionsSaving || !selectedSkillCount || !selectedUserCount}
+                size="sm"
+              >
+                {permissionsSaving ? (
+                  <>
+                    <Loader2Icon className="size-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Grant Access"
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handlePermissionMutation("revoke")}
+                disabled={permissionsSaving || !selectedSkillCount || !selectedUserCount}
+                size="sm"
+              >
+                Revoke Access
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearPermissionSelection}
+                disabled={!selectedSkillCount && !selectedUserCount}
+              >
+                Clear Selection
+              </Button>
+              {permissionsLoading && (
+                <span className="text-xs text-muted-foreground">Loading permissions...</span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Users Table */}
         <Card className="overflow-hidden">

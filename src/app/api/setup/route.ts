@@ -1,19 +1,18 @@
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
 import { hashPassword } from "better-auth/crypto";
+import { count } from "drizzle-orm";
 import crypto from "crypto";
+import { db } from "@/db";
+import { user, account } from "@/db/schema";
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Setup failed";
 }
 
 export async function POST(req: Request) {
-  const db = new Database("./sqlite.db");
   try {
-    const row = db.prepare("SELECT COUNT(*) as count FROM user").get() as {
-      count: number;
-    };
-    if (row.count > 0) {
+    const row = db.select({ count: count() }).from(user).get();
+    if (row && row.count > 0) {
       return NextResponse.json(
         { error: "Admin already exists" },
         { status: 403 }
@@ -29,18 +28,33 @@ export async function POST(req: Request) {
     }
 
     const id = crypto.randomUUID();
-    const now = new Date().toISOString();
+    const now = new Date();
     const hashedPw = await hashPassword(password);
 
-    db.prepare(
-      `INSERT INTO user (id, email, name, role, emailVerified, createdAt, updatedAt, banned)
-       VALUES (?, ?, ?, 'admin', 0, ?, ?, 0)`
-    ).run(id, email.toLowerCase(), name, now, now);
+    db.insert(user)
+      .values({
+        id,
+        email: email.toLowerCase(),
+        name,
+        role: "admin",
+        emailVerified: false,
+        createdAt: now,
+        updatedAt: now,
+        banned: false,
+      })
+      .run();
 
-    db.prepare(
-      `INSERT INTO account (id, accountId, providerId, password, userId, createdAt, updatedAt)
-       VALUES (?, ?, 'credential', ?, ?, ?, ?)`
-    ).run(crypto.randomUUID(), id, hashedPw, id, now, now);
+    db.insert(account)
+      .values({
+        id: crypto.randomUUID(),
+        accountId: id,
+        providerId: "credential",
+        password: hashedPw,
+        userId: id,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
@@ -50,11 +64,8 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
-    const db = new Database("./sqlite.db");
-    const row = db.prepare("SELECT COUNT(*) as count FROM user").get() as {
-      count: number;
-    };
-    return NextResponse.json({ hasUsers: row.count > 0 });
+    const row = db.select({ count: count() }).from(user).get();
+    return NextResponse.json({ hasUsers: row ? row.count > 0 : false });
   } catch {
     return NextResponse.json({ hasUsers: false });
   }

@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { ThemeToggle } from "./theme-toggle";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
+import { ExternalLinkIcon } from "lucide-react";
 
 const GITEA_URL = process.env.NEXT_PUBLIC_GITEA_URL || "http://localhost:3000";
 const ORG = process.env.NEXT_PUBLIC_GITEA_ORG || "weaver";
@@ -14,15 +18,19 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ children, page, rightActions }: AppHeaderProps) {
+  const { data: session } = authClient.useSession();
+  const userRole = (session?.user as Record<string, unknown> | undefined)
+    ?.role as string | undefined;
+
   return (
-    <header className="border-b border-app-border bg-app-surface/50 backdrop-blur-sm sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-        {/* Left: breadcrumb (docs page) or just children (home) */}
+    <header className="sticky top-0 z-10 border-b bg-card/80 backdrop-blur-sm">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+        {/* Left: breadcrumb (docs page) or children (home) */}
         <div className="flex items-center gap-4">
           {page === "docs" && (
             <Link
               href="/"
-              className="text-sm text-app-text-muted hover:text-app-text transition-colors shrink-0"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
             >
               ← 技能中心
             </Link>
@@ -31,25 +39,28 @@ export function AppHeader({ children, page, rightActions }: AppHeaderProps) {
         </div>
 
         {/* Right: page nav, theme toggle, repo link */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {page === "home" && (
             <Link
               href="/docs"
-              className="text-sm font-medium text-app-success-text border border-app-badge-border bg-app-badge-bg px-3 py-1.5 rounded-lg hover:opacity-80 transition-all"
+              className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
             >
               文档中心
             </Link>
           )}
           {rightActions}
           <ThemeToggle />
-          <a
-            href={`${GITEA_URL}/${ORG}/${DOCS_REPO}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-app-text-muted hover:text-app-text transition-colors"
-          >
-            仓库管理 →
-          </a>
+          {userRole === "admin" && (
+            <a
+              href={`${GITEA_URL}/${ORG}/${DOCS_REPO}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+            >
+              <ExternalLinkIcon className="size-4" />
+              仓库管理
+            </a>
+          )}
         </div>
       </div>
     </header>

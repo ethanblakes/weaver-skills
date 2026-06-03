@@ -20,4 +20,6 @@ export interface SkillMeta {
 
 export interface Skill extends GiteaRepo {
   meta: SkillMeta | null;
+  subdirs?: string[];
+  author?: string;
 }

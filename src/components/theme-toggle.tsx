@@ -1,36 +1,56 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+function subscribe() {
+  return () => {};
+}
+
+const themes = [
+  { key: "system", label: "System", icon: MonitorIcon },
+  { key: "light", label: "Light", icon: SunIcon },
+  { key: "dark", label: "Dark", icon: MoonIcon },
+] as const;
 
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const { setTheme, resolvedTheme } = useTheme();
+  const mounted = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false
+  );
 
   if (!mounted) {
-    return <div className="w-8 h-8" />;
+    return <div className="size-8" />;
   }
 
-  const isDark = resolvedTheme === "dark";
-
   return (
-    <button
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="rounded-md p-1.5 text-app-text-muted hover:text-app-text-primary hover:bg-app-surface-hover transition-colors"
-      aria-label="切换主题"
-      title={isDark ? "切换到亮色模式" : "切换到暗色模式"}
-    >
-      {isDark ? (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
-        </svg>
-      ) : (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-        </svg>
-      )}
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger className="inline-flex size-8 items-center justify-center rounded-md hover:bg-muted transition-colors">
+        <SunIcon className="size-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+        <MoonIcon className="absolute size-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        <span className="sr-only">Toggle theme</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {themes.map(({ key, label, icon: Icon }) => (
+          <DropdownMenuItem
+            key={key}
+            onClick={() => setTheme(key)}
+            className={resolvedTheme === key ? "bg-accent font-medium" : ""}
+          >
+            <Icon className="size-4" />
+            {label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

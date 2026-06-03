@@ -3,9 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Skill } from "../types";
 import { AppHeader } from "@/components/app-header";
-import { RefreshCwIcon } from "lucide-react";
+import { RefreshCwIcon, Share2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const GITEA_URL = process.env.NEXT_PUBLIC_GITEA_URL || "http://localhost:3000";
 const ORG = process.env.NEXT_PUBLIC_GITEA_ORG || "weaver";
@@ -355,6 +367,12 @@ export default function Home() {
                     {installCmd(skill)}
                   </code>
                   <CopyButton text={installCmd(skill)} />
+                  {isAdmin && (
+                    <ShareSkillDialog
+                      skillName={skill.meta?.name || skill.name}
+                      repoName={skill.name}
+                    />
+                  )}
                 </div>
               </div>
             ))}
@@ -432,11 +450,165 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="shrink-0 px-3 py-1 text-xs font-medium rounded-md
+      className="shrink-0 px-3 py-1 text-xs font-medium rounded-md cursor-pointer
                  bg-app-surface-elevated text-app-text-muted hover:bg-app-surface-hover hover:text-app-text
                  active:scale-95 transition-all"
     >
       {copied ? "已复制" : "复制"}
     </button>
+  );
+}
+
+function ShareSkillDialog({
+  skillName,
+  repoName,
+}: {
+  skillName: string;
+  repoName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [expiresAt, setExpiresAt] = useState("");
+  const [maxAccesses, setMaxAccesses] = useState("");
+  const [shareLink, setShareLink] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleCreate = async () => {
+    try {
+      setLoading(true);
+      const resp = await fetch("/api/shares", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          skillName: repoName,
+          expiresAt: expiresAt || null,
+          maxAccesses: maxAccesses ? parseInt(maxAccesses, 10) : null,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "创建分享链接失败");
+      setShareLink(`${window.location.origin}/share/${data.accessKey}`);
+      toast.success("分享链接已创建");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "创建分享链接失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setShareLink("");
+      setExpiresAt("");
+      setMaxAccesses("");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" title="Share" className="cursor-pointer">
+            <Share2Icon className="size-3.5" />
+          </Button>
+        }
+      />
+
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>分享: {skillName}</DialogTitle>
+          <DialogDescription>
+            设置过期时间和访问次数限制，生成分享链接。
+          </DialogDescription>
+        </DialogHeader>
+
+        {!shareLink ? (
+          <>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="expires">过期时间（可选）</Label>
+                <Input
+                  id="expires"
+                  type="datetime-local"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="maxAccesses">
+                  最大访问次数（可选）
+                </Label>
+                <Input
+                  id="maxAccesses"
+                  type="number"
+                  min="1"
+                  placeholder="不限次数"
+                  value={maxAccesses}
+                  onChange={(e) => setMaxAccesses(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                取消
+              </Button>
+              <Button onClick={handleCreate} disabled={loading}>
+                {loading ? (
+                  <svg
+                    className="animate-spin size-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                ) : null}
+                创建链接
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>分享链接</Label>
+                <div className="flex items-center gap-2">
+                  <Input value={shareLink} readOnly className="flex-1" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareLink);
+                      toast.success("已复制!");
+                    }}
+                  >
+                    复制
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => { setOpen(false); setShareLink(""); }}>
+                完成
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

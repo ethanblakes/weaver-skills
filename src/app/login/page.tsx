@@ -24,7 +24,7 @@ function LoginForm() {
   if (isPending) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-app-bg">
-        <div className="text-app-text-muted">Loading...</div>
+        <div className="text-app-text-muted">加载中...</div>
       </div>
     );
   }
@@ -42,12 +42,12 @@ function LoginForm() {
         password,
       });
       if (result.error) {
-        setError("Invalid email or password");
+        setError("邮箱或密码错误");
       } else {
         router.replace(redirect);
       }
     } catch {
-      setError("Login failed. Please try again.");
+      setError("登录失败，请重试。");
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ function LoginForm() {
             <span className="text-app-text-primary">Weaver</span>{" "}
             <span className="text-app-text-muted font-normal">技能中心</span>
           </h1>
-          <p className="text-sm text-app-text-muted mt-2">Sign in to continue</p>
+          <p className="text-sm text-app-text-muted mt-2">请登录以继续</p>
         </div>
 
         <form
@@ -79,7 +79,7 @@ function LoginForm() {
               htmlFor="email"
               className="block text-sm font-medium text-app-text mb-1.5"
             >
-              Email
+              邮箱
             </label>
             <input
               id="email"
@@ -99,7 +99,7 @@ function LoginForm() {
               htmlFor="password"
               className="block text-sm font-medium text-app-text mb-1.5"
             >
-              Password
+              密码
             </label>
             <input
               id="password"
@@ -120,7 +120,7 @@ function LoginForm() {
             className="w-full py-2.5 bg-app-text-primary text-app-bg rounded-lg text-sm font-medium
                        hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "登录中..." : "登录"}
           </button>
         </form>
       </div>
@@ -133,7 +133,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-app-bg">
-          <div className="text-app-text-muted">Loading...</div>
+          <div className="text-app-text-muted">加载中...</div>
         </div>
       }
     >

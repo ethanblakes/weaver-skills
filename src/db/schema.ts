@@ -136,3 +136,26 @@ export const skillPermission = sqliteTable(
     ),
   ]
 );
+
+export const sharedLink = sqliteTable(
+  "shared_link",
+  {
+    id: text("id").primaryKey(),
+    skillName: text("skill_name").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessKey: text("access_key").notNull(),
+    expiresAt: timestamp("expires_at"),
+    maxAccesses: integer("max_accesses"),
+    accessCount: integer("access_count").notNull().default(0),
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
+  },
+  (table) => [
+    index("shared_link_skill_name_idx").on(table.skillName),
+    index("shared_link_created_by_idx").on(table.createdBy),
+    uniqueIndex("shared_link_access_key_idx").on(table.accessKey),
+  ]
+);

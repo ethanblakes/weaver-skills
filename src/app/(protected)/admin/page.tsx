@@ -105,14 +105,14 @@ export default function AdminPage() {
       const res = await adminClient.admin.listUsers({ query: {} });
       setUsers((res.data?.users as AdminUser[]) || []);
     } catch {
-      toast.error("Failed to load users");
+      toast.error("加载用户列表失败");
     }
   }, []);
 
   const fetchSkills = useCallback(async () => {
     const resp = await fetch("/api/skills");
     const data = (await resp.json()) as { skills?: Skill[]; error?: string };
-    if (!resp.ok) throw new Error(data.error || "Failed to load skills");
+    if (!resp.ok) throw new Error(data.error || "加载技能列表失败");
     setSkills(data.skills || []);
   }, []);
 
@@ -124,10 +124,10 @@ export default function AdminPage() {
         grants?: SkillPermissionGrant[];
         error?: string;
       };
-      if (!resp.ok) throw new Error(data.error || "Failed to load permissions");
+      if (!resp.ok) throw new Error(data.error || "加载权限列表失败");
       setPermissionGrants(data.grants || []);
     } catch {
-      toast.error("Failed to load skill permissions");
+      toast.error("加载技能权限失败");
     } finally {
       setPermissionsLoading(false);
     }
@@ -181,7 +181,11 @@ export default function AdminPage() {
     }
     return map;
   }, [permissionGrants]);
+  const docsRepoName = process.env.NEXT_PUBLIC_GITEA_DOCS_REPO;
+
   const filteredSkills = skills.filter((skill) => {
+    // 文档仓库不参与权限分配
+    if (docsRepoName && skill.name === docsRepoName) return false;
     if (!skillSearch.trim()) return true;
     const q = skillSearch.toLowerCase();
     return (
@@ -191,6 +195,8 @@ export default function AdminPage() {
     );
   });
   const filteredPermissionUsers = users.filter((user) => {
+    // 管理员默认拥有所有权限，无需参与分配
+    if (user.role === "admin") return false;
     if (!userSearch.trim()) return true;
     const q = userSearch.toLowerCase();
     return (
@@ -221,7 +227,7 @@ export default function AdminPage() {
 
   const handlePermissionMutation = async (mode: "grant" | "revoke") => {
     if (!selectedSkillNames.length || !selectedUserIds.length) {
-      toast.error("Please select at least one skill and one user");
+      toast.error("请至少选择一个技能和一个用户");
       return;
     }
 
@@ -240,15 +246,15 @@ export default function AdminPage() {
         error?: string;
       };
 
-      if (!resp.ok) throw new Error(data.error || "Failed to update permissions");
+      if (!resp.ok) throw new Error(data.error || "更新权限失败");
 
       setPermissionGrants(data.grants || []);
       toast.success(
-        mode === "grant" ? "Skill access granted" : "Skill access revoked"
+        mode === "grant" ? "已授权技能访问" : "已撤销技能访问"
       );
       clearPermissionSelection();
     } catch {
-      toast.error("Failed to update skill permissions");
+      toast.error("更新技能权限失败");
     } finally {
       setPermissionsSaving(false);
     }
@@ -258,7 +264,7 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2Icon className="size-5 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+        <span className="ml-2 text-sm text-muted-foreground">加载中...</span>
       </div>
     );
   }
@@ -279,9 +285,9 @@ export default function AdminPage() {
         role: newRole,
       });
       if (res.error) {
-        toast.error("Failed to create user");
+        toast.error("创建用户失败");
       } else {
-        toast.success("User created successfully");
+        toast.success("用户创建成功");
         setCreateOpen(false);
         setNewEmail("");
         setNewPassword("");
@@ -290,7 +296,7 @@ export default function AdminPage() {
         fetchUsers();
       }
     } catch {
-      toast.error("Failed to create user");
+      toast.error("创建用户失败");
     } finally {
       setCreating(false);
     }
@@ -300,14 +306,14 @@ export default function AdminPage() {
     try {
       if (banned) {
         await adminClient.admin.unbanUser({ userId });
-        toast.success("User unbanned");
+        toast.success("用户已解封");
       } else {
         await adminClient.admin.banUser({ userId });
-        toast.success("User banned");
+        toast.success("用户已封禁");
       }
       fetchUsers();
     } catch {
-      toast.error("Failed to update ban status");
+      toast.error("更新封禁状态失败");
     }
   };
 
@@ -316,11 +322,11 @@ export default function AdminPage() {
     setDeleting(true);
     try {
       await adminClient.admin.removeUser({ userId: deleteUser.id });
-      toast.success(`User "${deleteUser.name}" deleted`);
+      toast.success(`用户「${deleteUser.name}」已删除`);
       setDeleteUser(null);
       fetchUsers();
     } catch {
-      toast.error("Failed to delete user");
+      toast.error("删除用户失败");
     } finally {
       setDeleting(false);
     }
@@ -329,10 +335,10 @@ export default function AdminPage() {
   const handleRole = async (userId: string, role: string) => {
     try {
       await adminClient.admin.setRole({ userId, role });
-      toast.success("Role updated");
+      toast.success("角色已更新");
       fetchUsers();
     } catch {
-      toast.error("Failed to update role");
+      toast.error("更新角色失败");
     }
   };
 
@@ -348,12 +354,12 @@ export default function AdminPage() {
               className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeftIcon className="size-4" />
-              Back to site
+              返回首页
             </Link>
             <span className="h-4 w-px bg-border" />
             <div>
-              <h1 className="text-sm font-semibold">Admin Panel</h1>
-              <p className="text-xs text-muted-foreground">User management</p>
+              <h1 className="text-sm font-semibold">管理面板</h1>
+              <p className="text-xs text-muted-foreground">用户管理</p>
             </div>
           </div>
           <Button
@@ -362,7 +368,7 @@ export default function AdminPage() {
             onClick={() => authClient.signOut()}
           >
             <LogOutIcon className="size-4" />
-            Sign out
+            退出登录
           </Button>
         </div>
       </header>
@@ -374,7 +380,7 @@ export default function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <UserIcon className="size-4 text-muted-foreground" />
-                Total Users
+                用户总数
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -387,7 +393,7 @@ export default function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <ShieldIcon className="size-4 text-muted-foreground" />
-                Admins
+                管理员
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -400,7 +406,7 @@ export default function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm">
                 <ShieldBanIcon className="size-4 text-destructive" />
-                Banned
+                已封禁
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -416,7 +422,7 @@ export default function AdminPage() {
           <div className="relative flex-1">
             <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search users by name, email, or role..."
+              placeholder="按姓名、邮箱或角色搜索用户..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8"
@@ -433,29 +439,28 @@ export default function AdminPage() {
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <Button onClick={() => setCreateOpen(true)} size="sm">
               <PlusIcon className="size-4" />
-              New User
+              新建用户
             </Button>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Create New User</DialogTitle>
+                <DialogTitle>创建新用户</DialogTitle>
                 <DialogDescription>
-                  Add a new user to the system. They can sign in with the
-                  credentials below.
+                  向系统添加新用户，可使用以下凭据登录。
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateUser} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name">姓名</Label>
                   <Input
                     id="name"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     required
-                    placeholder="Full name"
+                    placeholder="全名"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">邮箱</Label>
                   <Input
                     id="email"
                     type="email"
@@ -466,7 +471,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">密码</Label>
                   <Input
                     id="password"
                     type="password"
@@ -474,11 +479,11 @@ export default function AdminPage() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     required
                     minLength={8}
-                    placeholder="Minimum 8 characters"
+                    placeholder="至少 8 个字符"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Role</Label>
+                  <Label>角色</Label>
                   <Select
                     value={newRole}
                     onValueChange={(v) => v && setNewRole(v)}
@@ -487,8 +492,8 @@ export default function AdminPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="user">User</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="user">用户</SelectItem>
+                      <SelectItem value="admin">管理员</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -498,16 +503,16 @@ export default function AdminPage() {
                     variant="outline"
                     onClick={() => setCreateOpen(false)}
                   >
-                    Cancel
+                    取消
                   </Button>
                   <Button type="submit" disabled={creating}>
                     {creating ? (
                       <>
                         <Loader2Icon className="size-4 animate-spin" />
-                        Creating...
+                        创建中...
                       </>
                     ) : (
-                      "Create User"
+                      "创建用户"
                     )}
                   </Button>
                 </DialogFooter>
@@ -519,38 +524,59 @@ export default function AdminPage() {
         {/* Skill Permissions */}
         <Card>
           <CardHeader className="space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <ShieldIcon className="size-4 text-muted-foreground" />
-                  Skill Access
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Select one or more repositories and one or more users, then grant or revoke access in bulk.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{selectedSkillCount} skills selected</span>
-                <span>{selectedUserCount} users selected</span>
-              </div>
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldIcon className="size-4 text-muted-foreground" />
+                技能访问权限
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                选择仓库和用户，然后批量授权或撤销技能访问。
+              </p>
             </div>
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheckIcon className="size-3.5 text-green-600" />
+                管理员默认拥有全部技能访问权限，无需额外分配
+              </span>
+              {docsRepoName && (
+                <>
+                  <span className="hidden sm:inline text-border">|</span>
+                  <span>
+                    文档仓库 <Badge variant="secondary" className="text-[11px] px-1 py-0">{docsRepoName}</Badge> 对所有用户公开，无需授权
+                  </span>
+                </>
+              )}
+            </div>
+            {(selectedSkillCount > 0 || selectedUserCount > 0) && (
+              <div className="flex items-center gap-3 text-xs">
+                <Badge variant="secondary" className="gap-1">
+                  {selectedSkillCount} 个仓库已选
+                </Badge>
+                <Badge variant="secondary" className="gap-1">
+                  {selectedUserCount} 个用户已选
+                </Badge>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <Label>Repositories</Label>
-                  <Input
-                    value={skillSearch}
-                    onChange={(e) => setSkillSearch(e.target.value)}
-                    placeholder="Search skills..."
-                    className="max-w-56"
-                  />
+                  <Label className="shrink-0">仓库</Label>
+                  <div className="relative w-full max-w-56">
+                    <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={skillSearch}
+                      onChange={(e) => setSkillSearch(e.target.value)}
+                      placeholder="搜索..."
+                      className="pl-8 h-8 text-sm"
+                    />
+                  </div>
                 </div>
                 <div className="max-h-72 overflow-auto rounded-lg border">
                   {filteredSkills.length === 0 ? (
-                    <div className="p-4 text-sm text-muted-foreground">
-                      No skills found.
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      未找到技能。
                     </div>
                   ) : (
                     filteredSkills.map((skill) => {
@@ -559,7 +585,7 @@ export default function AdminPage() {
                       return (
                         <label
                           key={skill.name}
-                          className={`flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 ${
+                          className={`flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 transition-colors hover:bg-muted/30 ${
                             selected ? "bg-muted/50" : "bg-background"
                           }`}
                         >
@@ -568,10 +594,10 @@ export default function AdminPage() {
                               {skill.meta?.name || skill.name}
                             </div>
                             <div className="truncate text-xs text-muted-foreground">
-                              {skill.meta?.description || skill.description || "No description"}
+                              {skill.meta?.description || skill.description || "无描述"}
                             </div>
                             {assignedCount > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
+                              <div className="mt-1.5 flex flex-wrap gap-1">
                                 {Array.from(permissionMap.get(skill.name) || [])
                                   .slice(0, 3)
                                   .map((userId) => {
@@ -593,9 +619,9 @@ export default function AdminPage() {
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground">
-                              {assignedCount} users
+                          <div className="flex shrink-0 items-center gap-3">
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {assignedCount}
                             </span>
                             <input
                               type="checkbox"
@@ -619,18 +645,21 @@ export default function AdminPage() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <Label>Users</Label>
-                  <Input
-                    value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
-                    placeholder="Search users..."
-                    className="max-w-56"
-                  />
+                  <Label className="shrink-0">用户</Label>
+                  <div className="relative w-full max-w-56">
+                    <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="搜索..."
+                      className="pl-8 h-8 text-sm"
+                    />
+                  </div>
                 </div>
                 <div className="max-h-72 overflow-auto rounded-lg border">
                   {filteredPermissionUsers.length === 0 ? (
-                    <div className="p-4 text-sm text-muted-foreground">
-                      No users found.
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      {userSearch.trim() ? "没有匹配的用户。" : "暂无可分配的用户（管理员已自动拥有全部权限）。"}
                     </div>
                   ) : (
                     filteredPermissionUsers.map((user) => {
@@ -638,7 +667,7 @@ export default function AdminPage() {
                       return (
                         <label
                           key={user.id}
-                          className={`flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 ${
+                          className={`flex cursor-pointer items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0 transition-colors hover:bg-muted/30 ${
                             selected ? "bg-muted/50" : "bg-background"
                           }`}
                         >
@@ -650,8 +679,8 @@ export default function AdminPage() {
                               {user.email}
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <Badge variant="outline">{user.role}</Badge>
+                          <div className="flex shrink-0 items-center gap-3">
+                            <Badge variant="outline" className="text-[11px]">{user.role === "admin" ? "管理员" : "用户"}</Badge>
                             <input
                               type="checkbox"
                               checked={selected}
@@ -673,7 +702,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 border-t pt-4">
               <Button
                 onClick={() => void handlePermissionMutation("grant")}
                 disabled={permissionsSaving || !selectedSkillCount || !selectedUserCount}
@@ -682,10 +711,10 @@ export default function AdminPage() {
                 {permissionsSaving ? (
                   <>
                     <Loader2Icon className="size-4 animate-spin" />
-                    Saving...
+                    保存中...
                   </>
                 ) : (
-                  "Grant Access"
+                  "授权访问"
                 )}
               </Button>
               <Button
@@ -694,7 +723,7 @@ export default function AdminPage() {
                 disabled={permissionsSaving || !selectedSkillCount || !selectedUserCount}
                 size="sm"
               >
-                Revoke Access
+                撤销访问
               </Button>
               <Button
                 variant="ghost"
@@ -702,10 +731,10 @@ export default function AdminPage() {
                 onClick={clearPermissionSelection}
                 disabled={!selectedSkillCount && !selectedUserCount}
               >
-                Clear Selection
+                清除选择
               </Button>
               {permissionsLoading && (
-                <span className="text-xs text-muted-foreground">Loading permissions...</span>
+                <span className="text-xs text-muted-foreground">加载权限中...</span>
               )}
             </div>
           </CardContent>
@@ -717,12 +746,12 @@ export default function AdminPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Verified</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>用户</TableHead>
+                  <TableHead>角色</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead>已验证</TableHead>
+                  <TableHead>创建时间</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -733,8 +762,8 @@ export default function AdminPage() {
                       className="py-8 text-center text-muted-foreground"
                     >
                       {search.trim()
-                        ? "No users match your search."
-                        : "No users found."}
+                        ? "没有匹配的用户。"
+                        : "暂无用户。"}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -758,8 +787,8 @@ export default function AdminPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="user">User</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="user">用户</SelectItem>
+                              <SelectItem value="admin">管理员</SelectItem>
                             </SelectContent>
                           </Select>
                         )}
@@ -768,15 +797,15 @@ export default function AdminPage() {
                         <Badge
                           variant={user.banned ? "destructive" : "outline"}
                         >
-                          {user.banned ? "Banned" : "Active"}
+                          {user.banned ? "已封禁" : "正常"}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         {user.emailVerified ? (
-                          <Badge variant="outline">Verified</Badge>
+                          <Badge variant="outline">已验证</Badge>
                         ) : (
                           <span className="text-xs text-muted-foreground">
-                            Pending
+                            待验证
                           </span>
                         )}
                       </TableCell>
@@ -784,35 +813,37 @@ export default function AdminPage() {
                         {new Date(user.createdAt).toLocaleDateString("zh-CN")}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant={user.banned ? "outline" : "secondary"}
-                            size="xs"
-                            onClick={() => handleBan(user.id, user.banned)}
-                          >
-                            {user.banned ? (
-                              <>
-                                <ShieldCheckIcon className="size-3" />
-                                Unban
-                              </>
-                            ) : (
-                              <>
-                                <ShieldBanIcon className="size-3" />
-                                Ban
-                              </>
-                            )}
-                          </Button>
-                          {user.id !== session.user?.id && (
+                        {user.id === session.user?.id ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant={user.banned ? "outline" : "secondary"}
+                              size="xs"
+                              onClick={() => handleBan(user.id, user.banned)}
+                            >
+                              {user.banned ? (
+                                <>
+                                  <ShieldCheckIcon className="size-3" />
+                                  解封
+                                </>
+                              ) : (
+                                <>
+                                  <ShieldBanIcon className="size-3" />
+                                  封禁
+                                </>
+                              )}
+                            </Button>
                             <Button
                               variant="destructive"
                               size="xs"
                               onClick={() => setDeleteUser(user)}
                             >
                               <Trash2Icon className="size-3" />
-                              Delete
+                              删除
                             </Button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -832,13 +863,13 @@ export default function AdminPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete User</DialogTitle>
+            <DialogTitle>删除用户</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{" "}
+              确定要删除{" "}
               <span className="font-medium text-foreground">
                 {deleteUser?.name}
               </span>
-              ? This action cannot be undone.
+              ？此操作不可撤销。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -847,7 +878,7 @@ export default function AdminPage() {
               onClick={() => setDeleteUser(null)}
               disabled={deleting}
             >
-              Cancel
+              取消
             </Button>
             <Button
               variant="destructive"
@@ -857,10 +888,10 @@ export default function AdminPage() {
               {deleting ? (
                 <>
                   <Loader2Icon className="size-4 animate-spin" />
-                  Deleting...
+                  删除中...
                 </>
               ) : (
-                "Delete"
+                "删除"
               )}
             </Button>
           </DialogFooter>

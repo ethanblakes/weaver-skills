@@ -5,7 +5,20 @@ import { ThemeToggle } from "./theme-toggle";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
-import { ExternalLinkIcon, Settings2Icon, Share2Icon } from "lucide-react";
+import {
+  ExternalLinkIcon,
+  KeyRoundIcon,
+  MailIcon,
+  MenuIcon,
+  Settings2Icon,
+  Share2Icon,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const GITEA_URL = process.env.NEXT_PUBLIC_GITEA_URL || "http://localhost:3000";
 const ORG = process.env.NEXT_PUBLIC_GITEA_ORG || "weaver";
@@ -49,42 +62,67 @@ export function AppHeader({ children, page }: AppHeaderProps) {
             </Link>
           )}
           <ThemeToggle />
-          {userRole === "admin" && (
-            <>
-              <Link
-                href="/admin"
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "sm" }),
-                  "text-app-text-muted hover:text-app-text"
-                )}
-              >
-                <Settings2Icon className="size-3.5" />
-                <span className="ml-1.5">管理后台</span>
-              </Link>
-              <Link
-                href="/shares"
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "sm" }),
-                  "text-app-text-muted hover:text-app-text"
-                )}
-              >
-                <Share2Icon className="size-3.5" />
-                <span className="ml-1.5">分享管理</span>
-              </Link>
-              <a
-                href={`${GITEA_URL}/${ORG}/${DOCS_REPO}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "sm" }),
-                  "text-app-text-muted hover:text-app-text"
-                )}
-              >
-                <ExternalLinkIcon className="size-3.5" />
-                <span className="ml-1.5">仓库管理</span>
-              </a>
-            </>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "icon-sm" }),
+                "text-app-text-muted hover:text-app-text"
+              )}
+            >
+              <MenuIcon className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem
+                render={
+                  <Link href="/change-email" className="flex items-center gap-2">
+                    <MailIcon className="size-4" />
+                    修改邮箱
+                  </Link>
+                }
+              />
+              <DropdownMenuItem
+                render={
+                  <Link href="/change-password" className="flex items-center gap-2">
+                    <KeyRoundIcon className="size-4" />
+                    修改密码
+                  </Link>
+                }
+              />
+              {userRole === "admin" && (
+                <>
+                  <DropdownMenuItem
+                    render={
+                      <Link href="/admin" className="flex items-center gap-2">
+                        <Settings2Icon className="size-4" />
+                        管理后台
+                      </Link>
+                    }
+                  />
+                  <DropdownMenuItem
+                    render={
+                      <Link href="/shares" className="flex items-center gap-2">
+                        <Share2Icon className="size-4" />
+                        分享管理
+                      </Link>
+                    }
+                  />
+                  <DropdownMenuItem
+                    render={
+                      <a
+                        href={`${GITEA_URL}/${ORG}/${DOCS_REPO}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2"
+                      >
+                        <ExternalLinkIcon className="size-4" />
+                        仓库管理
+                      </a>
+                    }
+                  />
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

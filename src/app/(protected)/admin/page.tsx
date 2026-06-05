@@ -46,6 +46,7 @@ import {
   ShieldIcon,
   SearchIcon,
   XIcon,
+  KeyRoundIcon,
 } from "lucide-react";
 
 interface AdminUser {
@@ -96,6 +97,10 @@ export default function AdminPage() {
   // Delete confirmation dialog
   const [deleteUser, setDeleteUser] = useState<AdminUser | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Reset password confirmation dialog
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<AdminUser | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   const userRole = (session?.user as Record<string, unknown> | undefined)
     ?.role as string | undefined;
@@ -329,6 +334,28 @@ export default function AdminPage() {
       toast.error("删除用户失败");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordTarget) return;
+    setResetting(true);
+    try {
+      const resp = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: resetPasswordTarget.id }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json();
+        throw new Error(data.error || "重置密码失败");
+      }
+      toast.success(`用户「${resetPasswordTarget.name}」的密码已重置为 12345678`);
+      setResetPasswordTarget(null);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "重置密码失败");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -835,6 +862,14 @@ export default function AdminPage() {
                               )}
                             </Button>
                             <Button
+                              variant="outline"
+                              size="xs"
+                              onClick={() => setResetPasswordTarget(user)}
+                            >
+                              <KeyRoundIcon className="size-3" />
+                              重置密码
+                            </Button>
+                            <Button
                               variant="destructive"
                               size="xs"
                               onClick={() => setDeleteUser(user)}
@@ -892,6 +927,53 @@ export default function AdminPage() {
                 </>
               ) : (
                 "删除"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Confirmation Dialog */}
+      <Dialog
+        open={!!resetPasswordTarget}
+        onOpenChange={(open) => {
+          if (!open) setResetPasswordTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重置密码</DialogTitle>
+            <DialogDescription>
+              确定要将用户{" "}
+              <span className="font-medium text-foreground">
+                {resetPasswordTarget?.name}
+              </span>{" "}
+              的密码重置为{" "}
+              <span className="font-mono font-medium text-foreground">
+                12345678
+              </span>
+              ？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setResetPasswordTarget(null)}
+              disabled={resetting}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleResetPassword}
+              disabled={resetting}
+            >
+              {resetting ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" />
+                  重置中...
+                </>
+              ) : (
+                "确认重置"
               )}
             </Button>
           </DialogFooter>
